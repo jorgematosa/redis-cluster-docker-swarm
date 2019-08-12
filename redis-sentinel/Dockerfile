@@ -1,4 +1,4 @@
-FROM redis:4.0.11-alpine
+FROM redis:5-alpine
 
 LABEL version="1.0.2"
 
@@ -12,14 +12,18 @@ ENV SENTINEL_QUORUM=2 \
 RUN apk --no-cache add drill
 
 RUN mkdir -p /redis
+RUN chown redis:redis /redis
 
 WORKDIR /redis
 
 COPY sentinel.conf .
+RUN chown redis:redis /redis/sentinel.conf
 COPY sentinel-entrypoint.sh /usr/local/bin/
 
 RUN chown redis:redis /redis/* && \
     chmod +x /usr/local/bin/sentinel-entrypoint.sh
+
+USER redis
 
 EXPOSE 26379
 

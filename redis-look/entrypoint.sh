@@ -1,4 +1,7 @@
 #!/bin/sh
+redispass="/run/secrets/redis-proxy-password"
+export REDIS_PASSWORD=$(cat "$redispass") 
+sed -i "s/{{ REDIS_PASSWORD }}/$REDIS_PASSWORD/g" /redis/redis.conf
 
 until [ "$(redis-cli -h $REDIS_SENTINEL_IP -p $REDIS_SENTINEL_PORT ping)" = "PONG" ]; do
 	echo "$REDIS_SENTINEL_IP is unavailable - sleeping"
@@ -16,26 +19,16 @@ done
 master_ip=$(echo $master_info | awk '{print $1}')
 master_port=$(echo $master_info | awk '{print $2}')
 
-network_ips=$(ifconfig | grep inet | awk '{print $2}' | cut -d ':' -f 2)
-master_ip_masked=$(echo $master_ip | cut -d '.' -f 1,2,3)
+echo "Slave ip found: $SLAVE_IP"
 
-slave_announce_ip=""
+sed -i "s/{{ SLAVE_ANNOUNCE_IP }}/$SLAVE_IP/g" /redis/redis.conf
+sed -i "s/{{ TOTAL_ENTRIES_TO_BCKP }}/$ENTRIES_BEFORE_SAVE/g" /redis/redis.conf
+echo "Total entries to backup: $ENTRIES_BEFORE_SAVE"
 
-for network_ip in $network_ips; do
-	network_ip_masked=$(echo $network_ip | cut -d '.' -f 1,2,3)
-	if [ "$network_ip_masked" == "$master_ip_masked" ]; then
-		slave_announce_ip="$network_ip"
-		break
-	fi
-done
-
-if [ ! "$slave_announce_ip" ]; then
-	echo "Unable to resolve network ip"
-	exit 1
+# allow the container to be started with `--user`
+if [ "$1" = 'redis-server' -a "$(id -u)" = '0' ]; then
+	find . \! -user redis -exec chown redis '{}' +
+	exec su-exec redis "$0" "$@"
 fi
 
-echo "Slave ip found: $slave_announce_ip"
-
-sed -i "s/{{ SLAVE_ANNOUNCE_IP }}/$slave_announce_ip/g" /redis/redis.conf
-
-redis-server /redis/redis.conf --slaveof $master_ip $master_port
+redis-server /redis/redis.conf --slaveof $REDIS_MASTER_IP $master_port

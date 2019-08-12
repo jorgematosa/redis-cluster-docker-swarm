@@ -1,29 +1,119 @@
-version: '3.1'
-
+version: '3.6'
 
 services:
+  redis-zero:
+    image: redis-zero:latest
+    deploy:
+      replicas: 1
+    volumes:
+      - redis-master:/data/
+    networks:
+      - redis
+    environment:
+      - ENTRIES_BEFORE_SAVE=1
+    secrets:
+      - redis-proxy-password
+
 
   redis-sentinel:
-    image: thomasjpfan/redis-sentinel:${TAG:-latest}
+    image: redis-sentinel:${TAG:-latest}
     environment:
       - REDIS_IP=redis-zero
       - REDIS_MASTER_NAME=redismaster
+      - REDIS_MASTER_IP=redis-zero
+    ports:
+      - 26379:26379
     deploy:
       replicas: 3
     networks:
       - redis
-
-  redis:
-    image: thomasjpfan/redis-look:${TAG:-latest}
+    secrets:
+      - redis-proxy-password
+      
+  redis1:
+    image: redis-look:${TAG:-latest}
     environment:
       - REDIS_SENTINEL_IP=redis-sentinel
       - REDIS_MASTER_NAME=redismaster
+      - REDIS_MASTER_IP=redis-zero
       - REDIS_SENTINEL_PORT=26379
+      - SLAVE_IP=redis1
+      - ENTRIES_BEFORE_SAVE=1
+    volumes:
+      - redis-data1:/data
     deploy:
-      replicas: 3
+      replicas: 1
     networks:
       - redis
+    secrets:
+      - redis-proxy-password
+  redis2:
+    image: redis-look:${TAG:-latest}
+    environment:
+      - REDIS_SENTINEL_IP=redis-sentinel
+      - REDIS_MASTER_NAME=redismaster
+      - REDIS_MASTER_IP=redis-zero
+      - REDIS_SENTINEL_PORT=26379
+      - SLAVE_IP=redis2
+      - ENTRIES_BEFORE_SAVE=1
+    volumes:
+      - redis-data2:/data
+    deploy:
+      replicas: 1
+    networks:
+      - redis
+    secrets:
+      - redis-proxy-password
+  redis3:
+    image: redis-look:${TAG:-latest}
+    environment:
+      - REDIS_SENTINEL_IP=redis-sentinel
+      - REDIS_MASTER_NAME=redismaster
+      - REDIS_MASTER_IP=redis-zero
+      - REDIS_SENTINEL_PORT=26379
+      - SLAVE_IP=redis3
+      - ENTRIES_BEFORE_SAVE=1
+    volumes:
+      - redis-data3:/data
+    deploy:
+      replicas: 1
+    networks:
+      - redis
+    secrets:
+      - redis-proxy-password
+  proxy:
+    image: haproxy-redis:${TAG:-latest}
+    depends_on:
+      - redis-sentinel
+      - redis1
+      - redis2
+      - redis3
+    deploy:
+      replicas: 3
+    ports:
+      - '9001:9000'
+      - '6379:6379'
+    environment:
+      - REDIS_HOSTS=redis-zero,redis1,redis2,redis3
+    networks:
+      - redis
+    secrets:
+      - redis-proxy-password
 
 networks:
   redis:
+    external: true
+
+volumes:
+  redis-master:
+    driver: local
+  redis-data1:
+    driver: local
+  redis-data2:
+    driver: local
+  redis-data3:
+    driver: local
+
+secrets:
+  redis-proxy-password:
     external: true

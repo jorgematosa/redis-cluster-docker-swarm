@@ -1,6 +1,4 @@
-FROM redis:4.0.11-alpine
-
-LABEL version="1.0.2"
+FROM redis:5-alpine
 
 ENV REDIS_SENTINEL_IP redis-sentinel
 ENV REDIS_MASTER_NAME redismaster
@@ -11,7 +9,11 @@ COPY entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 WORKDIR /redis
+RUN chown redis:redis /redis
+
 COPY redis.conf .
+RUN chown redis:redis /redis/redis.conf
+USER redis
 
 EXPOSE 26379
 

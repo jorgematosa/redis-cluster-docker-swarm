@@ -1,0 +1,12 @@
+version: '3'
+services:
+  redis-commander:
+    container_name: redis-commander
+    hostname: redis-commander
+    image: rediscommander/redis-commander:latest
+    restart: always
+    environment:
+    # - REDIS_HOSTS=local:ptwmt1vr.vf-pt.internal.vodafone.com:9200:0:redis_tst
+    - REDIS_HOSTS=local:wdsrv07.corp.webdisplay.pt:6379:0:animal
+    ports:
+    - "8081:8081"
